@@ -52,7 +52,7 @@ jobs:
           if [ -d "public" ]; then
             cp -r public/* www/
           else
-            echo "<html><body>E视界</body></html>" > www/index.html
+            echo "<html><body>冬瓜视界</body></html>" > www/index.html
           fi
           echo "Created www directory manually as fallback"
 
@@ -206,7 +206,7 @@ jobs:
       - name: Rename APK with version
         run: |
           mv android/app/build/outputs/apk/release/app-release.apk \
-             android/app/build/outputs/apk/release/E视界-${{ steps.version.outputs.VERSION }}-universal.apk || \
+             android/app/build/outputs/apk/release/冬瓜视界-${{ steps.version.outputs.VERSION }}-universal.apk || \
           echo "APK rename skipped"
 
       - name: Upload APK Artifact
