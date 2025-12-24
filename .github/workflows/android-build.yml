@@ -3,49 +3,63 @@ name: Android Build & Release
 on:
   push:
     tags:
-      - "v*"
+      - 'v*.*.*'   # 仅在推送版本标签时触发
 
 jobs:
-  build-android:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ 拉取代码
+      # 1. 拉取代码
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ 设置 Node.js
+      # 2. Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '22'
+          cache: 'npm'
 
-      # 3️⃣ 安装依赖
-      - name: Install dependencies
-        run: npm install
+      # 3. Java (Android)
+      - name: Setup Java (JDK 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
 
-      # 4️⃣ 构建 Web 资源
-      - name: Build web
-        run: npm run build
+      # 4. Android SDK
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      # ============================
-      # 🔥 品牌 & 域名自动配置开始
-      # ============================
+      # 5. 安装依赖
+      - name: Install Node dependencies
+        run: npm ci
 
-      # 5️⃣ 配置应用名称 & 服务器地址
+      # 6. 保险措施：准备 Web 资源目录
+      - name: Prepare Web Assets
+        run: |
+          mkdir -p www
+          if [ -d "public" ]; then
+            cp -r public/* www/
+          else
+            echo "<html><body>冬瓜视界</body></html>" > www/index.html
+          fi
+
+      # 7. 强制写死品牌信息（关键）
       - name: Configure App Brand (Auto)
         run: |
-          echo "📝 Configure app brand..."
+          echo "📝 Applying custom brand config..."
+          tmp=$(mktemp)
+          jq \
+            --arg url "https://donggua.cf" \
+            --arg name "冬瓜视界" \
+            '.server.url = $url | .appName = $name' \
+            capacitor.config.json > "$tmp" && mv "$tmp" capacitor.config.json
 
-          # 应用名称（Web 层）
-          sed -i 's/E世界/冬瓜视界/g' src/**/*.ts src/**/*.js src/**/*.vue || true
+          echo "✅ App Name: 冬瓜视界"
+          echo "✅ Server URL: https://donggua.cf"
 
-          # 服务器地址（API / 后端）
-          sed -i 's|https://[^"]*|https://donggua.cf|g' src/**/*.ts src/**/*.js || true
-
-          echo "✅ Brand & server configured"
-
-      # 6️⃣ 修改 Android 显示名称（桌面显示）
       - name: Update Android App Name
         run: |
           echo "📝 Updating Android app name..."
@@ -53,52 +67,136 @@ jobs:
 
           if [ -f "$STRINGS_FILE" ]; then
             sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">冬瓜视界<\/string>/' "$STRINGS_FILE"
-            echo "✅ Android app_name updated"
+            echo "✅ Android app_name updated to 冬瓜视界"
           else
-            echo "❌ strings.xml not found"
+            echo "❌ strings.xml not found!"
             exit 1
           fi
 
-      # 7️⃣ 修改 Android applicationId（真正包名）
-      - name: Update Android applicationId
+      # 8. 显示最终配置（调试用）
+      - name: Show Capacitor Config
         run: |
-          echo "📝 Updating applicationId..."
-          GRADLE_FILE="android/app/build.gradle"
-          sed -i 's/applicationId "[^"]*"/applicationId "cf.donggua.shijie"/' "$GRADLE_FILE"
-          echo "✅ applicationId updated"
+          echo "=== Capacitor Config ==="
+          cat capacitor.config.json
 
-      # 8️⃣ 修改 AndroidManifest.xml 包名
-      - name: Update AndroidManifest package
+      # 9. 根据网站图标生成 Android 图标
+      - name: Generate App Icons from Website Icon
         run: |
-          echo "📝 Updating AndroidManifest.xml package..."
-          MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
-          sed -i 's/package="[^"]*"/package="cf.donggua.shijie"/' "$MANIFEST_FILE"
-          echo "✅ Manifest package updated"
+          sudo apt-get update && sudo apt-get install -y imagemagick
+          ICON_SRC="public/icon.png"
 
-      # ============================
-      # 🔥 Capacitor 同步
-      # ============================
+          convert "$ICON_SRC" -resize 36x36  -background none -gravity center -extent 48x48  android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert "$ICON_SRC" -resize 36x36  -background none -gravity center -extent 48x48  android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
 
-      # 9️⃣ 同步 Capacitor
+          convert "$ICON_SRC" -resize 54x54  -background none -gravity center -extent 72x72  android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert "$ICON_SRC" -resize 54x54  -background none -gravity center -extent 72x72  android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+
+          convert "$ICON_SRC" -resize 72x72  -background none -gravity center -extent 96x96  android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert "$ICON_SRC" -resize 72x72  -background none -gravity center -extent 96x96  android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+
+          convert "$ICON_SRC" -resize 108x108 -background none -gravity center -extent 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert "$ICON_SRC" -resize 108x108 -background none -gravity center -extent 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+
+          convert "$ICON_SRC" -resize 144x144 -background none -gravity center -extent 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          convert "$ICON_SRC" -resize 144x144 -background none -gravity center -extent 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+
+          echo "✅ App icons generated"
+
+      # 10. 同步 Capacitor
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # 🔟 设置 JDK
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
+      # 11. gradlew 权限
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
 
-      # 1️⃣1️⃣ 构建 APK
-      - name: Build Android APK
+      # 12. 构建 Release APK
+      - name: Build Release APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+      # 13. APK 签名（有 Secrets 用正式，没有就临时）
+      - name: Sign APK
         run: |
-          cd android
-          ./gradlew assembleRelease
+          BUILD_TOOLS_VERSION=$(ls $ANDROID_HOME/build-tools/ | sort -V | tail -n 1)
+          APKSIGNER="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/apksigner"
+          ZIPALIGN="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/zipalign"
 
-      # 1️⃣2️⃣ 上传 APK
-      - name: Upload APK artifact
+          UNSIGNED_APK="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          ALIGNED_APK="android/app/build/outputs/apk/release/app-release-aligned.apk"
+          SIGNED_APK="android/app/build/outputs/apk/release/app-release.apk"
+
+          KEYSTORE_FILE="release.keystore"
+
+          if [ -n "${{ secrets.SIGNING_KEY }}" ]; then
+            echo "🔐 Using Release Key from Secrets"
+            echo "${{ secrets.SIGNING_KEY }}" | base64 -d > $KEYSTORE_FILE
+            STORE_PASS="${{ secrets.KEY_STORE_PASSWORD }}"
+            KEY_ALIAS="${{ secrets.ALIAS }}"
+            KEY_PASS="${{ secrets.KEY_PASSWORD }}"
+          else
+            echo "⚠️ No Secrets found. Using temporary debug key"
+            keytool -genkeypair -v \
+              -keystore $KEYSTORE_FILE \
+              -storetype PKCS12 \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            STORE_PASS="android"
+            KEY_ALIAS="androiddebugkey"
+            KEY_PASS="android"
+          fi
+
+          $ZIPALIGN -v -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+
+          $APKSIGNER sign \
+            --ks "$KEYSTORE_FILE" \
+            --ks-pass pass:"$STORE_PASS" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass pass:"$KEY_PASS" \
+            --out "$SIGNED_APK" \
+            "$ALIGNED_APK"
+
+          rm -f "$UNSIGNED_APK" "$ALIGNED_APK" "$KEYSTORE_FILE"
+
+      # 14. 获取版本号
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      # 15. 重命名 APK
+      - name: Rename APK
+        run: |
+          mv android/app/build/outputs/apk/release/app-release.apk \
+             android/app/build/outputs/apk/release/冬瓜视界-${{ steps.version.outputs.VERSION }}-universal.apk
+
+      # 16. 上传 Artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: donggua-shijie-apk
+          name: 冬瓜视界-apk
           path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 30
+
+      # 17. 创建 GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "冬瓜视界 ${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## 📦 冬瓜视界 ${{ steps.version.outputs.VERSION }}
+
+            ### 🌐 内置服务器
+            - https://donggua.cf
+
+            ### 📱 APK
+            - 通用架构（支持手机 / 电视 / 盒子）
+
+            > 首次安装请允许“未知来源应用”
+          files: android/app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
