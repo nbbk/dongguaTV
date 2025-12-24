@@ -9,11 +9,11 @@ on:
       server_url:
         description: 'Server URL (e.g. https://your-site.com)'
         required: true
-        default: 'https://ednovas.video'
+        default: 'https://donggua.cf'
       app_name:
         description: 'App Name'
         required: true
-        default: 'E视界'
+        default: '冬瓜视界'
       version_tag:
         description: 'Version Tag (e.g. v1.0.0)'
         required: true
@@ -212,22 +212,22 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: E视界-apk
+          name: 冬瓜视界-apk
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          name: "E视界 ${{ steps.version.outputs.VERSION }}"
+          name: "冬瓜视界 ${{ steps.version.outputs.VERSION }}"
           body: |
-            ## 📦 E视界 ${{ steps.version.outputs.VERSION }}
+            ## 📦 冬瓜视界 ${{ steps.version.outputs.VERSION }}
             
             ### 📱 Android APK 下载
             
             | 文件 | 说明 |
             |------|------|
-            | `E视界-${{ steps.version.outputs.VERSION }}-universal.apk` | 通用版 (支持所有设备) |
+            | `冬瓜视界-${{ steps.version.outputs.VERSION }}-universal.apk` | 通用版 (支持所有设备) |
             
             ### 🖥️ 支持的 CPU 架构
             - ✅ `armeabi-v7a` (ARM 32位 - 旧手机/盒子)
@@ -242,7 +242,7 @@ jobs:
             - ✅ 智能投影仪
             
             ### 🌐 内置服务器
-            - 默认连接: `https://ednovas.video`
+            - 默认连接: `https://donggua.cf`
             
             ---
             
